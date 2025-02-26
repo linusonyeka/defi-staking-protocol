@@ -210,3 +210,36 @@
     (/ (* (* share-amount blocks-staked) (var-get yield-rate)) u10000))
 )
 
+;; Administrative functions
+(define-private (verify-and-update-admin (new-admin principal))
+    (begin
+        (asserts! (not (is-eq new-admin NULL_ADDRESS)) ERR-INVALID-ADMIN)
+        (let ((staker-data (get-staker-position new-admin)))
+            (asserts! (is-some staker-data) ERR-INVALID-ADMIN)
+            (let ((verified-data (unwrap! staker-data ERR-ADMIN-VALIDATION)))
+                (asserts! (> (get liquidity-shares verified-data) u0) ERR-ADMIN-VALIDATION)
+                (asserts! (>= block-height (get unlock-block verified-data)) ERR-ADMIN-VALIDATION)
+                (ok (var-set protocol-admin new-admin)))))
+)
+
+(define-public (transfer-admin (new-admin principal))
+    (begin
+        (asserts! (is-eq tx-sender (var-get protocol-admin)) ERR-UNAUTHORIZED)
+        (asserts! (not (is-eq new-admin NULL_ADDRESS)) ERR-INVALID-ADMIN)
+        (try! (verify-and-update-admin new-admin))
+        (ok true))
+)
+
+(define-public (update-yield-rate (new-rate uint))
+    (begin
+        (asserts! (is-eq tx-sender (var-get protocol-admin)) ERR-UNAUTHORIZED)
+        (asserts! (> new-rate u0) ERR-TOKEN-MISMATCH)
+        (ok (var-set yield-rate new-rate)))
+)
+
+(define-public (set-protocol-status)
+    (begin
+        (asserts! (is-eq tx-sender (var-get protocol-admin)) ERR-UNAUTHORIZED)
+        (var-set protocol-active (not (var-get protocol-active)))
+        (ok true))
+)
